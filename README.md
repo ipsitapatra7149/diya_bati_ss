@@ -35,3 +35,9 @@ Validation is the process of evaluating a model during training to tune hyperpar
 4. Data Leakage Prevention
 
   The test set must remain untouched until the final evaluation. Validation ensures you don’t indirectly "peek" at the test   set during development
+
+
+
+  Diabetic_expandeddataset-maryada
+  Diabetic_Synthetic_Merged_Fixed-ipsita
+  Diabetic_Merged-combiantion of all
