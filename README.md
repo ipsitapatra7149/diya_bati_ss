@@ -1,4 +1,4 @@
-# diya_bati_ss
+# PREDICTION OF AGE OF ONSET OF DIABETES FOR AN INDIAN NON-DIABETIC PERSON USING ML REGRESSION 
 
 Shahid_DTR.ipynb : This file contains the work I previously did with my Decision Tree Regresstion Model
                    Uses the Train-Test split Method
@@ -37,7 +37,7 @@ Validation is the process of evaluating a model during training to tune hyperpar
   The test set must remain untouched until the final evaluation. Validation ensures you don’t indirectly "peek" at the test   set during development
 
 
-
+DATASET: 
   Diabetic_expandeddataset-maryada
   Diabetic_Synthetic_Merged_Fixed-ipsita
   Diabetic_Merged-combiantion of all
