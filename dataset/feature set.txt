@@ -1,0 +1,41 @@
+
+Age Group: Under 18,18-24,25-34,35-44,45-54,55-64,65 or older
+Gender: Male, Female
+Height: (in cms)
+Weight: (in kgs)
+Current Occupation: "Employed", "Retired", "Unemployed", "Self-employed"
+Age at Diagnosis: Under 18,18-34,35-44,45-54,55 or older
+Fasting Blood Sugar: (in mg/dL)
+Postprandial Blood Sugar: (in mg/dL)
+Average Blood sugar in 3 months: (in mg/dL)
+HbA1c Levels: Below 5.7%,5.7%-6.4%,6.5%-7.5%,7.6%-9.0%,9.1% or higher,Not sure
+Use of Medication: Insulin, Oral Medication, "Insulin;Oral medications"
+Frequency of Doctor Visits: Monthly, Every 3 months,Every 6 months,Once a year,Rarely,Never
+Frequency of Blood Sugar Testing: Multiple times a day,Once a day,A few times a week,Rarely,Never
+Other Chronic Conditions: realistic combination of (Hypertension, None (Or anything u want to add here))
+Meal Frequency : "Rarely, I often skip meals","Sometimes, I eat 1-2 meals a day","Regularly, I have 3 meals a day","Frequently, I have more than 3 meals a day"
+Sugar Consumption: Daily,Several times a week,Once a week,Rarely,Never
+Oily Food Consumption: Daily,Several times a week,Once a week,Rarely,Never
+Processed Food Consumption: Daily,Several times a week,Once a week,Rarely,Never
+Food Source Preference: Mostly homemade,Mostly ordered,A mix of both
+Physical Activity Level: Sedentary (little to no exercise),Moderate (light exercise 1-3 days/week),Active (moderate to intense exercise 4+ days/week)
+Smoking Habits: Never,Occasionally (per month),Occasionally (per week),Regularly (daily or almost daily)
+Alcohol Consumption: Never,Occasionally (per month),Occasionally (per week),Regularly (daily or almost daily)
+Sleep Patterns: Less than 5 hours,5-6 hours,7-8 hours,More than 8 hours
+Which side of the family has diabetes: Maternal,Paternal,Both,None
+Maternal_Age at Diagnosis:Under 18,18-34,35-44,45-54,55 or older
+Maternal_Duration of Diabetes:Less than 5 years,5 -10 years,10-20 years,More than 20 years
+Maternal_HbA1c Levels: Below 5.7%,5.7%-6.4%,6.5%-7.5%,7.6%-9.0%,9.1% or higher,Not sure
+Maternal_Use of Medication: Insulin, Oral Medication, "Insulin;Oral medications"
+Maternal_Dietary Pattern: realistic combination of (Balanced,High Carb, High Sugar, High Protein, LCHF)
+Maternal_Physical Activity Level: Sedentary (little to no exercise),Moderate (light exercise 1-3 days/week),Active (moderate to intense exercise 4+ days/week)
+Paternal_Age at Diagnosis:Under 18,18-34,35-44,45-54,55 or older
+Paternal_Duration of Diabetes:Less than 5 years,5 -10 years,10-20 years,More than 20 years
+Paternal_HbA1c Levels: Below 5.7%,5.7%-6.4%,6.5%-7.5%,7.6%-9.0%,9.1% or higher,Not sure
+Paternal_Use of Medication: Insulin, Oral Medication, "Insulin;Oral medications"
+Paternal_Dietary Pattern: realistic combination of (Balanced,High Carb, High Sugar, High Protein, LCHF)
+Paternal_Physical Activity Level: Sedentary (little to no exercise),Moderate (light exercise 1-3 days/week),Active (moderate to intense exercise 4+ days/week)
+Awareness of Diabetes-Related Risks: Very aware,Somewhat aware,Not very aware,Not aware at all
+Stress Levels Related to Diabetes Management: Very high,High,Moderate,Low,Very low
+Support from Family and Friends: Very supportive,Somewhat supportive,Neutral,Not very supportive,Not supportive at all
+Financial Burden of Diabetes Treatment: Very high,High,Moderate,Low,Very low
