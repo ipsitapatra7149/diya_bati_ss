@@ -1,0 +1,174 @@
+"""
+**NOTE for the viewer : this is addition to the main code so this code won't work without the implementation of the main code. the use of this code is to do optuna fo all models and not just dt to improve performance. but alias there was only 0.01 improvement
+"""
+import pandas as pd
+import numpy as np
+import optuna
+from sklearn.model_selection import train_test_split, KFold
+from xgboost import XGBRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.svm import SVR
+from sklearn.linear_model import Ridge, LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Hyperparameter optimization function for each model
+def optimize_rf(trial):
+    params = {
+        'n_estimators': trial.suggest_int('n_estimators', 100, 500),
+        'max_depth': trial.suggest_int('max_depth', 3, 20),
+        'min_samples_split': trial.suggest_int('min_samples_split', 2, 10),
+        'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 10),
+        'max_features': trial.suggest_categorical('max_features', ['sqrt', 'log2', None])
+    }
+    model = RandomForestRegressor(random_state=42, **params)
+    pipe = Pipeline([('preprocessor', preprocessor), ('regressor', model)])
+    pipe.fit(X_train, y_train)
+    preds = pipe.predict(X_test)
+    return r2_score(y_test, preds)
+
+def optimize_xgb(trial):
+    params = {
+        'n_estimators': trial.suggest_int('n_estimators', 100, 500),
+        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.2, log=True),  # Updated
+        'max_depth': trial.suggest_int('max_depth', 3, 15),
+        'subsample': trial.suggest_float('subsample', 0.5, 1, log=True),  # Updated
+        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1, log=True),  # Updated
+        'gamma': trial.suggest_float('gamma', 0.01, 1, log=True)  # Updated
+    }
+    model = XGBRegressor(random_state=42, **params)
+    pipe = Pipeline([('preprocessor', preprocessor), ('regressor', model)])
+    pipe.fit(X_train, y_train)
+    preds = pipe.predict(X_test)
+    return r2_score(y_test, preds)
+
+def optimize_svr(trial):
+    params = {
+        'C': trial.suggest_float('C', 1e-3, 1e3, log=True),  # Updated
+        'epsilon': trial.suggest_float('epsilon', 1e-3, 1, log=True),  # Updated
+        'kernel': trial.suggest_categorical('kernel', ['linear', 'rbf', 'poly'])
+    }
+    model = SVR(**params)
+    pipe = Pipeline([('preprocessor', preprocessor), ('regressor', model)])
+    pipe.fit(X_train, y_train)
+    preds = pipe.predict(X_test)
+    return r2_score(y_test, preds)
+
+def optimize_ridge(trial):
+    params = {
+        'alpha': trial.suggest_float('alpha', 1e-3, 1e3, log=True),  # Updated
+        'solver': trial.suggest_categorical('solver', ['auto', 'svd', 'cholesky', 'lsqr', 'sparse_cg'])
+    }
+    model = Ridge(**params)
+    pipe = Pipeline([('preprocessor', preprocessor), ('regressor', model)])
+    pipe.fit(X_train, y_train)
+    preds = pipe.predict(X_test)
+    return r2_score(y_test, preds)
+
+# Optimizing all models
+study_rf = optuna.create_study(direction='maximize')
+study_rf.optimize(optimize_rf, n_trials=30)
+
+study_xgb = optuna.create_study(direction='maximize')
+study_xgb.optimize(optimize_xgb, n_trials=30)
+
+study_svr = optuna.create_study(direction='maximize')
+study_svr.optimize(optimize_svr, n_trials=30)
+
+study_ridge = optuna.create_study(direction='maximize')
+study_ridge.optimize(optimize_ridge, n_trials=30)
+
+# Best models after optimization
+best_rf = RandomForestRegressor(random_state=42, **study_rf.best_params)
+best_xgb = XGBRegressor(random_state=42, **study_xgb.best_params)
+best_svr = SVR(**study_svr.best_params)
+best_ridge = Ridge(**study_ridge.best_params)
+
+# Define all models (with optimized hyperparameters)
+all_models = {
+    "rf": best_rf,
+    "xgb": best_xgb,
+    "svr": best_svr,
+    "dt": best_dt,
+    "lr": LinearRegression(),
+    "ridge": best_ridge
+}
+
+# Function to evaluate models (as per the original code)
+model_scores = []
+def evaluate_model(name, y_true, y_pred):
+    mae = mean_absolute_error(y_true, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+    r2 = r2_score(y_true, y_pred)
+    model_scores.append({"Model": name, "MAE": mae, "RMSE": rmse, "R2": r2})
+    print(f"\n{name} Model:")
+    print(f"MAE: {mae:.2f}")
+    print(f"RMSE: {rmse:.2f}")
+    print(f"R²: {r2:.2f}")
+
+    # Actual vs Predicted
+    plt.figure(figsize=(6, 4))
+    sns.scatterplot(x=y_true, y=y_pred)
+    plt.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], '--', color='red')
+    plt.xlabel("Actual")
+    plt.ylabel("Predicted")
+    plt.title(f"Actual vs Predicted - {name}")
+    plt.tight_layout()
+    plt.show()
+
+    # Residual Plot
+    residuals = y_true - y_pred
+    plt.figure(figsize=(6, 4))
+    sns.histplot(residuals, kde=True, bins=20)
+    plt.title(f"Residual Distribution - {name}")
+    plt.xlabel("Residual")
+    plt.tight_layout()
+    plt.show()
+
+# Evaluate models
+for name, model in all_models.items():
+    pipe = Pipeline([('preprocessor', preprocessor), ('regressor', model)])
+    pipe.fit(X_train, y_train)
+    preds = pipe.predict(X_test)
+    evaluate_model(name.upper(), y_test, preds)
+
+# Evaluate stacking model (as per your original stacking logic)
+for stage_num, model_keys in enumerate(stacking_stages, start=1):
+    print(f"\n🔁 Stacking Stage {stage_num}: {model_keys}")
+
+    stack_train_parts, stack_test_parts = [], []
+
+    for key in model_keys:
+        model = all_models[key]
+        oof_train, oof_test = get_oof_predictions(model, X_train, y_train, X_test)
+        stack_train_parts.append(oof_train)
+        stack_test_parts.append(oof_test)
+
+    stack_train = np.hstack(stack_train_parts)
+    stack_test = np.hstack(stack_test_parts)
+
+    meta_model = Ridge(alpha=1.0)
+    meta_model.fit(stack_train, y_train)
+    final_pred = meta_model.predict(stack_test)
+
+    evaluate_model(f"Stacking Stage {stage_num}", y_test, final_pred)
+
+    # Plot model comparison with hue
+scores_df = pd.DataFrame(model_scores)
+scores_melted = scores_df.melt(id_vars='Model', var_name='Metric', value_name='Score')
+
+plt.figure(figsize=(12, 6))
+sns.barplot(data=scores_melted, x='Model', y='Score', hue='Metric', palette='CMRmap')  # Dark2, CMRmap, Set1
+plt.title('Model Comparison by Metrics')
+plt.ylabel('Score')
+plt.xlabel('Model')
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.legend(title='Metric')
+plt.show()

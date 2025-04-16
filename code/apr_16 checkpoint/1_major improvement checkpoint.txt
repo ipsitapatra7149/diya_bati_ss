@@ -1,0 +1,382 @@
+"""
+**NOTE for the viewer : if u want to understand what all changes were done sorry i can't explain.....anyways.....nan values were reduced by adding 'None' string to them and also correct preprocessing, age to numeric mapping was corrected , create_features function is also corrected (check that part urself i won't explain ahh yes its converted to create_BMI so make sure to this term while understanding what has been done)
+"""
+import pandas as pd
+import numpy as np
+import optuna
+from sklearn.model_selection import train_test_split, KFold
+from xgboost import XGBRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.svm import SVR
+from sklearn.linear_model import Ridge, LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, LabelEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load data
+df = pd.read_excel("/content/updated_current(self-employed replaced).xlsx")
+# Drop unnecessary columns
+print(type(df))
+columns_to_drop = ['Fasting Blood Sugar', 'Postprandial Blood Sugar', 'Average Blood sugar in 3 months', 'HbA1c Levels']
+df.drop(columns=columns_to_drop, inplace=True, errors='ignore')  # this is correct
+print(f"Total Columns: {df.shape[1]}")
+
+# Set default "None" for missing values in 'Use of medication'
+columns_to_fill = ['Use of Medication','Maternal_Age at Diagnosis','Maternal_Duration of Diabetes','Maternal_HbA1c Levels','Maternal_Use of Medication','Maternal_Dietary Pattern',
+    'Maternal_Physical Activity Level','Paternal_Age at Diagnosis','Paternal_Duration of Diabetes','Paternal_HbA1c Levels','Paternal_Use of Medication','Paternal_Dietary Pattern',
+    'Paternal_Physical Activity Level']
+
+for col in columns_to_fill:
+    if col in df.columns:
+        print(f"Processing column: {col}")
+        print("NaNs before fill:", df[col].isna().sum())
+        df[col] = df[col].fillna('None')
+        print("NaNs after fill:", df[col].isna().sum())
+        print(f"{col}:\n{df[col].head()}\n")
+    else:
+        print(f"Column '{col}' not found!")
+
+columns_to_convert = ['Other Chronic Conditions', 'Which side of the family has diabetes']
+for col in columns_to_convert:
+    if col in df.columns:
+        df[col] = df[col].fillna('None')
+
+for col in df.columns:
+    print(f"Column '{col}' has {df[col].isna().sum()} NaN values.")
+    print(f"Unique values in '{col}': {df[col].unique()}")
+
+# Convert Age at Diagnosis to numeric
+def age_diag_to_numeric(x):
+    mapping = {'Under 18': 9, '18-34': 26,'35-44': 39.5,'35-45': 39.5, '45-54': 49.5, '55 or older': 60}
+    return mapping.get(x, np.nan)
+
+df['Age_at_Diagnosis_numeric'] = df['Age at Diagnosis'].apply(age_diag_to_numeric)
+
+print(f"Total rows before dropping: {df.shape[0]}")
+
+# Identify rows with NaN in the new column
+rows_to_drop = df[df['Age_at_Diagnosis_numeric'].isna()]
+print("Row indices being dropped:")
+print(rows_to_drop.index.tolist())  # show row numbers (indices)
+print(f"Number of rows being dropped: {len(rows_to_drop)}")
+
+# Drop those rows
+df = df.dropna(subset=['Age_at_Diagnosis_numeric'])
+
+print(f"Total rows after dropping: {df.shape[0]}")
+
+# Define updated mapping for Age Group
+def age_group_to_numeric(x):
+    mapping = {'Under 18': 9, '18-24': 21, '25-34': 29.5, '35-44': 39.5, '45-54': 49.5, '55-64': 59.5, '65 or older': 70}
+    return mapping.get(x, np.nan)
+
+df['Age_Group_numeric'] = df['Age Group'].apply(age_group_to_numeric)
+print(f"Total rows before dropping: {df.shape[0]}")
+df = df.dropna(subset=['Age_Group_numeric'])
+print(f"Total rows after dropping: {df.shape[0]}")
+
+# Check result
+columns_to_drop = ['Age Group', 'Age at Diagnosis']
+df.drop(columns=columns_to_drop, inplace=True, errors='ignore')
+print(df.head())
+
+# Feature Engineering function (without target as input)
+def create_BMI(df):
+    df = df.copy()
+    
+    # Number of rows before filtering
+    print(f"Total rows before filtering: {df.shape[0]}")
+
+    # Access 'Weight' and 'Height' from the original df using the index of data
+    df['Weight'] = df['Weight']
+    df['Height'] = df['Height']
+
+    # BMI Calculation
+    df['BMI'] = df['Weight'] / ((df['Height'] / 100) ** 2)
+
+    high_bmi_rows = df[df['BMI'] >= 50]
+    if not high_bmi_rows.empty:
+        print("\n Rows with BMI ≥ 50:")
+        print(high_bmi_rows[['Weight', 'Height', 'BMI']])
+    else:
+        print("There aren't any rows having BMI above 50")
+
+    # Filter rows based on BMI range
+    valid_indices = df[(df['BMI'] >= 14) & (df['BMI'] < 50)].index
+    df = df.loc[valid_indices]
+
+    # Number of rows after filtering
+    print(f"Total rows after filtering: {df.shape[0]}")
+
+    # Drop Height and Weight columns
+    df.drop(columns=['Height', 'Weight'], inplace=True, errors='ignore')
+
+    high_bmi_rows = df[df['BMI'] >= 50]
+    if not high_bmi_rows.empty:
+        print("\n Rows with BMI ≥ 50:")
+        print(high_bmi_rows[['Weight', 'Height', 'BMI']])
+    else:
+        print("There aren't any rows having BMI above 50")
+
+    return df
+
+# Feature Engineering before creating X and y
+df = create_BMI(df)
+
+# Check the transformed train set
+print(df.head())
+
+# Now split into X and y after feature engineering
+X = df.drop(columns=['Age_at_Diagnosis_numeric'])
+y = df['Age_at_Diagnosis_numeric']
+
+# Split data into train and test sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Column Types
+numeric_features = X_train.select_dtypes(include=['int64', 'float64']).columns.tolist()
+categorical_features = X_train.select_dtypes(include=['object']).columns.tolist()
+print(f"Categorical Features: {categorical_features}")
+manual_features = ['BMI','Age_Group_numeric']
+print(f"Manual Features: {manual_features}")
+numeric_features = [f for f in numeric_features if f not in manual_features]
+print(f"Numeric Features: {numeric_features}")
+
+# Preprocessing Pipelines
+numeric_transformer = Pipeline([
+    ('imputer', SimpleImputer(strategy='median')),
+    ('scaler', StandardScaler())
+])
+
+categorical_transformer = Pipeline([
+    ('imputer', SimpleImputer(strategy='most_frequent')),
+    ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
+])
+
+manual_transformer = Pipeline([
+    ('imputer', SimpleImputer(strategy='median')),
+    ('scaler', StandardScaler())
+])
+
+preprocessor = ColumnTransformer(transformers=[
+    ('num', numeric_transformer, numeric_features),
+    ('cat', categorical_transformer, categorical_features),
+    ('man', manual_transformer, manual_features)
+])
+
+
+# Optimize Decision Tree with Optuna
+def objective(trial):
+    params = {
+        'max_depth': trial.suggest_int('max_depth', 2, 20),
+        'min_samples_split': trial.suggest_int('min_samples_split', 2, 10),
+        'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 10),
+        'max_features': trial.suggest_categorical('max_features', ['sqrt', 'log2', None])
+    }
+    model = DecisionTreeRegressor(random_state=42, **params)
+    pipe = Pipeline([
+        ('preprocessor', preprocessor),
+        ('regressor', model)
+    ])
+    pipe.fit(X_train, y_train)
+    preds = pipe.predict(X_test)
+    return r2_score(y_test, preds)
+
+study = optuna.create_study(direction='maximize')
+study.optimize(objective, n_trials=30)
+
+best_dt = DecisionTreeRegressor(random_state=42, **study.best_params)
+
+# Columns after create_features (still readable, pre-encoding)
+original_cols = X_train.columns.tolist()
+
+# Columns after full pipeline (numeric + one-hot + manual features)
+encoded_feature_names = list(
+    preprocessor.transformers_[1][1].named_steps["onehot"]
+    .get_feature_names_out(categorical_features)
+)
+final_cols = numeric_features + encoded_feature_names + manual_features
+
+# Find removed columns
+removed_cols = [col for col in original_cols if col not in final_cols]
+
+# Print vertically
+print("❌ Removed Columns After Full Pipeline:")
+for col in removed_cols:
+    print(" -", col)
+
+print("\n✅ Final Columns After Full Pipeline:")
+for col in final_cols:
+    print(" -", col)
+
+
+# Fit the preprocessor on training data and transform
+X_train_final = preprocessor.fit_transform(X_train)
+
+# For test data
+X_test_final = preprocessor.transform(X_test)
+
+# If it's a NumPy array, convert to DataFrame for easier viewing
+feature_names = (
+    numeric_features +
+    list(preprocessor.transformers_[1][1].named_steps["onehot"].get_feature_names_out(categorical_features)) +
+    manual_features
+
+)
+X_train_final_df = pd.DataFrame(X_train_final.toarray() if hasattr(X_train_final, 'toarray') else X_train_final,
+                                columns=feature_names)
+
+print("🔍 Final Feature Set After Full Pipeline:")
+print(X_train_final_df.head())
+
+
+# Define all models
+all_models = {
+    "rf": RandomForestRegressor(n_estimators=200, random_state=42),
+    "xgb": XGBRegressor(n_estimators=300, learning_rate=0.05, max_depth=5, random_state=42),
+    "svr": SVR(kernel='rbf', C=10, epsilon=0.1),
+    "dt": best_dt,
+    "lr": LinearRegression()
+}
+
+# Function to evaluate models
+model_scores = []
+def evaluate_model(name, y_true, y_pred):
+    mae = mean_absolute_error(y_true, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+    r2 = r2_score(y_true, y_pred)
+    model_scores.append({"Model": name, "MAE": mae, "RMSE": rmse, "R2": r2})
+    print(f"\n{name} Model:")
+    print(f"MAE: {mae:.2f}")
+    print(f"RMSE: {rmse:.2f}")
+    print(f"R²: {r2:.2f}")
+
+    # Actual vs Predicted
+    plt.figure(figsize=(6, 4))
+    sns.scatterplot(x=y_true, y=y_pred)
+    plt.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], '--', color='red')
+    plt.xlabel("Actual")
+    plt.ylabel("Predicted")
+    plt.title(f"Actual vs Predicted - {name}")
+    plt.tight_layout()
+    plt.show()
+
+    # Residual Plot
+    residuals = y_true - y_pred
+    plt.figure(figsize=(6, 4))
+    sns.histplot(residuals, kde=True, bins=20)
+    plt.title(f"Residual Distribution - {name}")
+    plt.xlabel("Residual")
+    plt.tight_layout()
+    plt.show()
+
+# Evaluate individual base models
+for name, model in all_models.items():
+    pipe = Pipeline([
+        ('preprocessor', preprocessor),
+        ('regressor', model)
+    ])
+    pipe.fit(X_train, y_train)
+    preds = pipe.predict(X_test)
+    evaluate_model(name.upper(), y_test, preds)
+
+    # Feature importance for XGB
+xgb_model = Pipeline([
+    ('preprocessor', preprocessor),
+    ('regressor', all_models['xgb'])
+])
+xgb_model.fit(X_train, y_train)
+feature_names = xgb_model.named_steps['preprocessor'].transformers_[1][1].named_steps['onehot'].get_feature_names_out(categorical_features)
+all_features = numeric_features + list(feature_names) + manual_features
+importances = xgb_model.named_steps['regressor'].feature_importances_
+importance_df = pd.DataFrame({'Feature': all_features, 'Importance': importances})
+importance_df['Feature'] = importance_df['Feature'].str.replace('cat__', '', regex=False)
+importance_df = importance_df.sort_values(by='Importance', ascending=False)
+
+# Feature Importance with hue
+top_n = 20
+top_features = importance_df.head(top_n).copy()
+top_features['Importance Level'] = pd.qcut(top_features['Importance'], q=3, labels=["Low", "Medium", "High"])
+
+cleaned_feature_names = all_features
+
+feat_imp = pd.Series(importances, index=cleaned_feature_names).sort_values(ascending=False)
+
+plt.figure(figsize=(12, 6))
+sns.barplot(x=feat_imp.values[:20], y=feat_imp.index[:20], palette="viridis")
+plt.title(f'Top {top_n} Feature Importances (XGBoost)')
+plt.xlabel('Importance Score')
+plt.ylabel('Feature')
+plt.tight_layout()
+plt.legend(title='Importance Level')
+plt.show()
+
+# Define stacking stages (idhr stcaking stages separately define hue hain)
+stacking_stages = [
+    ["rf", "xgb"],
+    ["rf", "xgb", "svr"],
+    ["rf", "xgb", "svr", "dt"],
+    ["rf", "xgb", "svr", "dt", "lr"]
+]
+
+# Function to get OOF predictions (this was done to overcome ipsi ka 1 R^2)
+def get_oof_predictions(model, X, y, X_test, n_splits=5):
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+    oof_train = np.zeros(len(X))
+    oof_test = np.zeros(len(X_test))
+    oof_test_folds = np.empty((n_splits, len(X_test)))
+
+    for i, (train_idx, val_idx) in enumerate(kf.split(X)):
+        X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]
+        y_tr, y_val = y.iloc[train_idx], y.iloc[val_idx]
+
+        pipeline = Pipeline([
+            ('preprocessor', preprocessor),
+            ('regressor', model)
+        ])
+        pipeline.fit(X_tr, y_tr)
+        oof_train[val_idx] = pipeline.predict(X_val)
+        oof_test_folds[i, :] = pipeline.predict(X_test)
+
+    oof_test[:] = oof_test_folds.mean(axis=0)
+    return oof_train.reshape(-1, 1), oof_test.reshape(-1, 1)
+
+    # Run stacking for each stage (idhr separately each tsacking combo ko run kiya hai)
+for stage_num, model_keys in enumerate(stacking_stages, start=1):
+    print(f"\n🔁 Stacking Stage {stage_num}: {model_keys}")
+
+    stack_train_parts, stack_test_parts = [], []
+
+    for key in model_keys:
+        model = all_models[key]
+        oof_train, oof_test = get_oof_predictions(model, X_train, y_train, X_test)
+        stack_train_parts.append(oof_train)
+        stack_test_parts.append(oof_test)
+
+    stack_train = np.hstack(stack_train_parts)
+    stack_test = np.hstack(stack_test_parts)
+
+    meta_model = Ridge(alpha=1.0)
+    meta_model.fit(stack_train, y_train)
+    final_pred = meta_model.predict(stack_test)
+
+    evaluate_model(f"Stacking Stage {stage_num}", y_test, final_pred)
+
+    # Plot model comparison with hue
+scores_df = pd.DataFrame(model_scores)
+scores_melted = scores_df.melt(id_vars='Model', var_name='Metric', value_name='Score')
+
+plt.figure(figsize=(12, 6))
+sns.barplot(data=scores_melted, x='Model', y='Score', hue='Metric', palette='CMRmap')  #Dark2, CMRmap, Set1
+plt.title('Model Comparison by Metrics')
+plt.ylabel('Score')
+plt.xlabel('Model')
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.legend(title='Metric')
+plt.show()
